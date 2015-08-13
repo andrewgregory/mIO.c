@@ -1,3 +1,30 @@
+/*
+ * Copyright 2015 Andrew Gregory <andrew.gregory.8@gmail.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ * Project URL: http://github.com/andrewgregory/mio.c
+ */
+
+#ifndef MIO_C
+#define MIO_C
+
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -12,7 +39,7 @@ int mio_getc(FILE *stream) {
         errno = 0;
         c = fgetc(stream);
     } while(c == EOF && errno == EINTR);
-    if(c != EOF || feof(stream) ) { errno = errno_orig; }
+    if(errno == EINTR || errno == 0 ) { errno = errno_orig; }
     return c;
 }
 
@@ -22,11 +49,11 @@ int mio_getc_unlocked(FILE *stream) {
         errno = 0;
         c = fgetc_unlocked(stream);
     } while(c == EOF && errno == EINTR);
-    if(c != EOF || feof(stream) ) { errno = errno_orig; }
+    if(errno == EINTR || errno == 0 ) { errno = errno_orig; }
     return c;
 }
 
-size_t mio_read(int fd, void *buf, size_t count) {
+ssize_t mio_read(int fd, void *buf, size_t count) {
     int errno_sav = errno;
     size_t ret = 0;
     while(count) {
@@ -43,19 +70,8 @@ size_t mio_read(int fd, void *buf, size_t count) {
         if(r <= len) { count -= len; buf += len; }
         else { break; }
     }
-    if(ret > 0) { errno = errno_sav; }
+    if(ret != -1) { errno = errno_sav; }
     return ret;
-}
-
-size_t mio_fread(void *ptr, size_t size, size_t nmemb, FILE *stream) {
-}
-
-int mio_putc(int c, FILE *stream) {
-    return 0;
-}
-
-int mio_puts(const char *s, FILE *stream) {
-    return 0;
 }
 
 char *mio_fgets(char *buf, size_t size, FILE *stream) {
@@ -86,8 +102,8 @@ char *mio_fgets(char *buf, size_t size, FILE *stream) {
     return s;
 }
 
-char *mio_getdelim(char **restrict s, size_t *restrict n, int delim, FILE *restrict f)
-{
+char *mio_getdelim(char **restrict s, size_t *restrict n, int delim,
+        FILE *restrict f) {
     int errno_sav = errno;
     size_t i = 0;
 
@@ -224,3 +240,23 @@ FILE *mio_freopen(const char *path, const char *mode, FILE *stream) {
     if(ret != NULL) { errno = errno_sav; }
     return ret;
 }
+
+int mio_pselect(int nfds, fd_set *restrict readfds, fd_set *restrict writefds,
+        fd_set *restrict errorfds, const struct timespec *restrict timeout,
+        const sigset_t *restrict sigmask) {
+    int ret, errno_sav = errno;
+    do { ret = pselect(nfds, readfds, writefds, errorfds, timeout, sigmask); }
+    while(ret == -1 && errno == EINTR);
+    if(ret != -1) { errno = errno_sav; }
+    return ret;
+}
+int mio_select(int nfds, fd_set *restrict readfds, fd_set *restrict writefds,
+        fd_set *restrict errorfds, struct timeval *restrict timeout) {
+    int ret, errno_sav = errno;
+    do { ret = select(nfds, readfds, writefds, errorfds, timeout); }
+    while(ret == -1 && errno == EINTR);
+    if(ret != -1) { errno = errno_sav; }
+    return ret;
+}
+
+#endif /* MIO_C */
