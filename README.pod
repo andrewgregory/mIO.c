@@ -1,0 +1,122 @@
+=head1 NAME
+
+mio - EINTR-safe IO functions with reliable return values
+
+=head1 SYNOPSIS
+
+Handling IO in C is unnecessarily difficult.  Improperly handled signals can
+interrupt low-level read/write calls and standard C<FILE> functions are plagued
+by useless or unreliable return values.  C<mio> provides a series of wrappers
+that attempt to overcome both of these problems.
+
+=head1 DESCRIPTION
+
+=head2 Signals
+
+The system read/write calls can be interrupted by signals.  By default signals
+are either ignored or terminate the program, so the interrupted call is of no
+consequence.  If the program modifies this behavior and catches signals,
+however, the interrupted calls may cause programs to abort IO operations too
+soon.  This may be prevented by setting the C<SA_RESTART> flag when assigning
+the signal handler.  This is not a practical solution for libraries, which
+would be forced to modify all signal handler flags for each IO operation and
+reset them afterwards.  Instead C<mio>'s functions detect C<EINTR> and retry
+the operation.
+
+=head2 Return Values
+
+Many standard IO functions have poor return values.  C<fgets> returns a pointer
+to the buffer being read into, which is not only useless as the caller must
+already have that value but also leaves no way for the caller to reliably get
+the length of the data read into the buffer.  C<getline> and C<getdelim> tried
+to rectify this problem, but they return a signed C<ssize_t> value to represent
+the length of data written to the buffer.  According to getdlim(3P) they B<may>
+fail with C<EOVERFLOW> if the delimiter or C<EOF> is not seen within
+C<SSIZE_MAX> bytes but do not have to, making the returned size unreliable.
+
+=head2 Read Functions
+
+=over
+
+=item int mio_getc(FILE *f)
+
+=item int mio_getc_unlocked(FILE *f)
+
+=item char *mio_fgets(char *s, size_t n, FILE *f)
+
+Similar to fgets(3) except a pointer to the terminating NUL byte is returned
+rather than a pointer to the buffer.
+
+=item size_t mio_getdelim(char **s, size_t *n, int delim, FILE *f)
+
+Similar to getdelim(3) except the return type is C<size_t> and C<0> is returned
+on EOF or errors rather than C<-1>.
+
+=item size_t mio_getline(char **s, size_t *n, FILE *f)
+
+Similar to getline(3) except the return type is C<size_t> and C<0> is returned
+on EOF or errors rather than C<-1>.
+
+=item size_t mio_fread
+
+=item size_t mio_read
+
+=back
+
+=head2 Write Functions
+
+=over
+
+=item size_t mio_write
+
+=item size_t mio_fwrite
+
+=item size_t mio_fprintf
+
+=item size_t mio_vfprintf
+
+=item size_t mio_fputs
+
+=item size_t mio_fputc
+
+=back
+
+=head2 Other Functions
+
+=over
+
+=item int mio_open
+
+=item int mio_openat
+
+=item FILE *mio_fopen
+
+=item FILE *mio_fdopen
+
+=item FILE *mio_freopen
+
+=back
+
+=head1 EXAMPLES
+
+ #include "mio.c"
+
+ int main(void) {
+     char *end, *buf = NULL;
+     size_t len = 0;
+     while((c = mio_getdelim(&buf, &len, '\n', stdin)) > 0) {
+        mio_fwrite(buf, 1, len, stdout);
+     }
+     if(!feof(stdin)) {
+         /* something went wrong that prevented us from reaching the end */
+         return 1;
+     } else {
+         return 0;
+     }
+ }
+
+=head1 CAVEATS
+
+feof(3) must be used rather than ferror(3) to check for errors from
+C<mio_getline> and C<mio_getdelim> because POSIX does not provide a way to set
+the error flag for C<FILE> streams.
