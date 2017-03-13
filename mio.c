@@ -33,16 +33,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-int mio_getc(FILE *stream) {
-    int c, errno_orig = errno;
-    do {
-        errno = 0;
-        c = fgetc(stream);
-    } while(c == EOF && errno == EINTR);
-    if(errno == EINTR || errno == 0 ) { errno = errno_orig; }
-    return c;
-}
-
 int mio_getc_unlocked(FILE *stream) {
     int c, errno_orig = errno;
     do {
@@ -53,25 +43,12 @@ int mio_getc_unlocked(FILE *stream) {
     return c;
 }
 
-ssize_t mio_read(int fd, void *buf, size_t count) {
-    int errno_sav = errno;
-    size_t ret = 0;
-    while(count) {
-        size_t len = count > SIZE_MAX / 2 ? SIZE_MAX / 2 : count;
-        ssize_t r;
-
-        do { r = read(fd, buf, len); }
-        while(r == -1 && errno == EINTR);
-
-        if(r == -1) { return 0; }
-
-        ret += r;
-
-        if(r <= len) { count -= len; buf += len; }
-        else { break; }
-    }
-    if(ret != -1) { errno = errno_sav; }
-    return ret;
+int mio_getc(FILE *stream) {
+    int c;
+    flockfile(stream);
+    c = mio_getc_unlocked(stream);
+    funlockfile(stream);
+    return c;
 }
 
 char *mio_fgets(char *buf, size_t size, FILE *stream) {
