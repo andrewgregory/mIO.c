@@ -96,6 +96,8 @@ reached or an error other than C<EINTR> is encountered.
 
 =item FILE *mio_fopen
 
+=item FILE *mio_fopenat
+
 =item FILE *mio_fdopen
 
 =item FILE *mio_freopen
@@ -105,6 +107,24 @@ reached or an error other than C<EINTR> is encountered.
 =item int mio_select
 
 =item int mio_fflush
+
+=item int mio_closedir
+
+=item int mio_readdir
+
+readdir(3P) returns NULL to indicate both errors and the end of the listing.
+The only way for callers to differentiate between the two is to clear C<errno>
+beforehand and check afterwards.  C<mio_readdir> handles clearing, checking,
+and restoring C<errno> as necessary for the caller.  NOTE: if the caller is not
+concerned about modifying C<errno> on success, it is faster to just clear
+C<errno> manually like so:
+
+ while(errno = 0, (ent = readdir(dirp))) {
+     /* loop through directory contents */
+ }
+ if(errno != 0) {
+     /* handle error */
+ }
 
 =back
 

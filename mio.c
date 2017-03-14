@@ -236,4 +236,37 @@ int mio_select(int nfds, fd_set *restrict readfds, fd_set *restrict writefds,
     return ret;
 }
 
+FILE *mio_fopenat(int dirfd, const char *path, const char *mode) {
+    int fd, flags = 0, rwflag = 0;
+    FILE *stream;
+    switch(*(mode++)) {
+        case 'r': rwflag = O_RDONLY; break;
+        case 'w': rwflag = O_WRONLY; flags |= O_CREAT | O_TRUNC; break;
+        case 'a': rwflag = O_WRONLY; flags |= O_CREAT | O_APPEND; break;
+        default: errno = EINVAL; return NULL;
+    }
+    if(mode[1] == 'b') { mode++; }
+    if(mode[1] == '+') { mode++; rwflag = O_RDWR; }
+    while(*mode) {
+        switch(*(mode++)) {
+            case 'e': flags |= O_CLOEXEC; break;
+            case 'x': flags |= O_EXCL; break;
+        }
+    }
+    if((fd = openat(dirfd, path, flags | rwflag, 0666)) < 0) { return NULL; }
+    if((stream = fdopen(fd, mode)) == NULL) { close(fd); return NULL; }
+    return stream;
+}
+
+
+int mio_readdir(DIR *dirp, struct dirent **result) {
+    int err = errno;
+    if((*result = readdir(dirp)) || errno == 0) {
+        errno = err;
+        return 0;
+    } else {
+        return errno;
+    }
+}
+
 #endif /* MIO_C */
